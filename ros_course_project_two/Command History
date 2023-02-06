@@ -1,0 +1,12 @@
+Terminal Actions:
+
+Starting rviz & gazebo:
+roslaunch turtlebot3_gazebo turtlebot3_stage_4.launch
+roslaunch turtlebot3_slam turtlebot3_slam.launch slam_methods:=gmapping
+roslaunch ros_course_project_two turtlebot3_navigation.launch
+
+Growing obstacles & publishing markers:
+rosrun ros_course_project_two frontier_detection.py
+
+Segmenting frontiers:
+rosrun ros_course_project_two frontier_segmentation.py
