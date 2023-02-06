@@ -36,6 +36,7 @@ class frontierEvaluation():
     centroids = None
     goalPos = None
     grid = None
+    init_callback_flag = False
     
     def __init__(self):
         """
@@ -80,10 +81,11 @@ class frontierEvaluation():
         """
         Creates a tf listener and obtains the transformation data using the tfBuffer class variable. 
         """
+        tfBuffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tfBuffer)
         while not rospy.is_shutdown() :        
             try:
-                listener = tf2_ros.TransformListener(frontierEvaluation.tfBuffer)
-                trans = frontierEvaluation.tfBuffer.lookup_transform("map", "base_footprint", rospy.Time())
+                trans = tfBuffer.lookup_transform("map", "base_footprint", rospy.Time())
                 x,y = trans.transform.translation.x,trans.transform.translation.y
                 frontierEvaluation.pos.position.x = x
                 frontierEvaluation.pos.position.y = y
@@ -121,12 +123,14 @@ class frontierEvaluation():
         pose.orientation.w = 1.0
         
         #Sets up a listener for the transformation of map to robot coordinates
-        listener = tf2_ros.TransformListener(frontierEvaluation.tfBuffer)
+        tfBuffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tfBuffer)
+
         while not rospy.is_shutdown():
             rospy.sleep(0)
             try:
                 #looks up the transformation to the robot's frame.
-                trans = frontierEvaluation.tfBuffer.lookup_transform("base_footprint", "map", rospy.Time(0))
+                trans = tfBuffer.lookup_transform("base_footprint", "map", rospy.Time())
                 break
             except:
                 continue
@@ -226,7 +230,7 @@ class frontierEvaluation():
             distances += distance
 
         centers = getPointArray(centers, occupancy_grid)
-        centerMarker = createMarkers(points=centers, indx=c, action=0, ns="centroids", color=[255,255,255], scale=0.3, style=7)
+        centerMarker = createMarkers(points=centers, indx=0, action=0, ns="centroids", color=[255,255,255], scale=0.3, style=7)
         
         df["distance"] = distances
         df["centroid_x"] = centroid_x
@@ -290,9 +294,9 @@ class frontierEvaluation():
         Returns:
             Tuple: Returns a tuple containing the updated (x,y) point
         """        
-        for i in range(15):
-            dx = random.randint(-5, 5)
-            dy = random.randint(-5, 5)
+        for i in range(50):
+            dx = random.randint(-7, 7)
+            dy = random.randint(-7, 7)
             if self.habitability(x+dx, y+dy, grid):
                 return (x+dx, y+dy)
         return None
@@ -304,11 +308,12 @@ class frontierEvaluation():
         obtain results. 
         """        
         #This is just a check to make sure that the subscriber callback has occurred before running
-        while type(frontierEvaluation.frontiersGrid) == type(None) and not rospy.is_shutdown():
+        while frontierEvaluation.init_callback_flag == False and not rospy.is_shutdown():
             rospy.sleep(1)
         
         #Runs until all frontiers have been visited. 
         while len(set(frontierEvaluation.cache["cluster"])) > 0  and not rospy.is_shutdown():
+            print('entering nav mode')
             rospy.sleep(1)
 
             #Gets a list of the unique frontiers (the coordinates, cluster, and distance from the robot)
@@ -398,7 +403,16 @@ class frontierEvaluation():
         
         elif len(set(frontierEvaluation.cache["cluster"])) == 0:
             print("Congrats! All centroids were explored! Returning to the origin....")
-            self.coordinate_callback_thread(0, 0, 0)
+            
+            #Deleting:
+            m = Marker(action=3)
+            self.pub.publish(m)
+            self.centroids_pub.publish(m)
+            mrkrArr = MarkerArray()
+            mrkrArr.markers.append(m)
+            self.frontiers_pub.publish(mrkrArr)
+
+            self.coordinate_callback(0.7, 0, 0)
             self.client.wait_for_result()
             sys.exit("Exiting the program. ")
     
@@ -421,7 +435,8 @@ class frontierEvaluation():
             df = self.dbscan(frontiers, 5, 8)
 
             frontierEvaluation.frontier_markers, frontierEvaluation.centroids, frontierEvaluation.cache = self.colorClusters(df, frontierEvaluation.occ_grid)
-
+            print(len(set(frontierEvaluation.cache["cluster"])))
+            frontierEvaluation.init_callback_flag = True
             print("done")
 
         else:
