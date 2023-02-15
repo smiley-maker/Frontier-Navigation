@@ -44,7 +44,7 @@ class frontierEvaluation():
         It also calls the main function. Note that I decided to have a main program running
         simultaneously to the subscriber callback to improve performance. 
         """        
-        self.init_node()
+        self.init_node() 
         self.init_action_client()
         self.init_listener()
         self.init_publishers()
